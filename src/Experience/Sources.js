@@ -97,7 +97,7 @@ export default [
         obfuscate: true,
         path: './textures/hdr/nebula.png',
         meta: {
-            "type": "exrTexture"
+            "type": "texture"
         }
     },
     {

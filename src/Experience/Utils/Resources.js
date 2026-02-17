@@ -1,12 +1,4 @@
 import * as THREE from 'three/webgpu'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
-import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js'
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js'
-import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
-import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js'
-import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import EventEmitter from './EventEmitter.js'
 
 //import Obfuscate from '@experience/Utils/Helpers/Obfuscate.js';
@@ -28,7 +20,8 @@ export default class Resources extends EventEmitter {
         this.loaded = 0
         this.loadedAll = false
 
-        this.setLoaders()
+        const typesUsed = new Set( this.sources.map( ( s ) => s.type ) )
+        this.setLoaders( typesUsed )
         this.startLoading()
     }
 
@@ -60,31 +53,86 @@ export default class Resources extends EventEmitter {
         } )
     }
 
-    setLoaders() {
+    setLoaders( typesUsed ) {
         this.loaders = {}
-        this.loaders.gltfLoader = new GLTFLoader()
-        this.loaders.objLoader = new OBJLoader()
         this.loaders.textureLoader = new THREE.TextureLoader()
-        this.loaders.cubeTextureLoader = new THREE.CubeTextureLoader()
-        this.loaders.HDRLoader = new HDRLoader()
-        this.loaders.EXRLoader = new EXRLoader()
-        this.loaders.fontLoader = new FontLoader()
         this.loaders.AudioLoader = new THREE.AudioLoader()
 
-        // add DRACOLoader
-        const dracoLoader = new DRACOLoader()
-        dracoLoader.setDecoderPath( '/draco/' )
+        if ( typesUsed.has( 'cubeTexture' ) ) {
+            this.loaders.cubeTextureLoader = new THREE.CubeTextureLoader()
+        }
 
-        const ktx2Loader = new KTX2Loader();
-        ktx2Loader.setTranscoderPath( '/basis/' );
-        ktx2Loader.detectSupportAsync(this.renderer);
-
-        this.loaders.gltfLoader.setDRACOLoader( dracoLoader )
-        this.loaders.gltfLoader.setKTX2Loader( ktx2Loader );
-        this.loaders.gltfLoader.setMeshoptDecoder( MeshoptDecoder );
+        // Loaders created on first use in startLoading (lazy init for DRACO, KTX2, EXR, HDR, Font, OBJ, GLTF)
+        this._loaderPromises = {}
     }
 
-    startLoading() {
+    _ensureGltfLoader() {
+        if ( !this._loaderPromises.gltfLoader ) {
+            this._loaderPromises.gltfLoader = this._initGltfLoaders()
+        }
+        return this._loaderPromises.gltfLoader
+    }
+
+    _ensureObjLoader() {
+        if ( !this._loaderPromises.objLoader ) {
+            this._loaderPromises.objLoader = import( 'three/addons/loaders/OBJLoader.js' ).then( ( { OBJLoader } ) => {
+                this.loaders.objLoader = new OBJLoader()
+                return this.loaders.objLoader
+            } )
+        }
+        return this._loaderPromises.objLoader
+    }
+
+    _ensureHDRLoader() {
+        if ( !this._loaderPromises.HDRLoader ) {
+            this._loaderPromises.HDRLoader = import( 'three/examples/jsm/loaders/HDRLoader.js' ).then( ( { HDRLoader } ) => {
+                this.loaders.HDRLoader = new HDRLoader()
+                return this.loaders.HDRLoader
+            } )
+        }
+        return this._loaderPromises.HDRLoader
+    }
+
+    _ensureEXRLoader() {
+        if ( !this._loaderPromises.EXRLoader ) {
+            this._loaderPromises.EXRLoader = import( 'three/examples/jsm/loaders/EXRLoader.js' ).then( ( { EXRLoader } ) => {
+                this.loaders.EXRLoader = new EXRLoader()
+                return this.loaders.EXRLoader
+            } )
+        }
+        return this._loaderPromises.EXRLoader
+    }
+
+    _ensureFontLoader() {
+        if ( !this._loaderPromises.fontLoader ) {
+            this._loaderPromises.fontLoader = import( 'three/examples/jsm/loaders/FontLoader.js' ).then( ( { FontLoader } ) => {
+                this.loaders.fontLoader = new FontLoader()
+                return this.loaders.fontLoader
+            } )
+        }
+        return this._loaderPromises.fontLoader
+    }
+
+    async _initGltfLoaders() {
+        const [ { GLTFLoader }, { DRACOLoader }, { KTX2Loader }, { MeshoptDecoder } ] = await Promise.all( [
+            import( 'three/examples/jsm/loaders/GLTFLoader.js' ),
+            import( 'three/examples/jsm/loaders/DRACOLoader.js' ),
+            import( 'three/examples/jsm/loaders/KTX2Loader.js' ),
+            import( 'three/examples/jsm/libs/meshopt_decoder.module.js' ),
+        ] )
+        const dracoLoader = new DRACOLoader()
+        dracoLoader.setDecoderPath( '/draco/' )
+        const ktx2Loader = new KTX2Loader()
+        ktx2Loader.setTranscoderPath( '/basis/' )
+        await ktx2Loader.detectSupportAsync( this.renderer )
+        this.loaders.gltfLoader = new GLTFLoader()
+        this.loaders.gltfLoader.setDRACOLoader( dracoLoader )
+        this.loaders.gltfLoader.setKTX2Loader( ktx2Loader )
+        this.loaders.gltfLoader.setMeshoptDecoder( MeshoptDecoder )
+        return this.loaders.gltfLoader
+    }
+
+    async startLoading() {
         // Load each source
         for ( const source of this.sources ) {
             switch ( source.type ) {
@@ -138,7 +186,8 @@ export default class Resources extends EventEmitter {
                     break
 
                 case 'gltfModel':
-                    this.loaders.gltfLoader.load(
+                    const gltfLoader = await this._ensureGltfLoader()
+                    gltfLoader.load(
                         source.path,
                         ( file ) => {
                             this.sourceLoaded( source, file )
@@ -147,6 +196,7 @@ export default class Resources extends EventEmitter {
                     break
 
                 case 'objModel':
+                    await this._ensureObjLoader()
                     this.loaders.objLoader.load(
                         source.path,
                         ( file ) => {
@@ -198,6 +248,7 @@ export default class Resources extends EventEmitter {
                     break
 
                 case 'rgbeTexture':
+                    await this._ensureHDRLoader()
                     this.loaders.HDRLoader.load(
                         source.path,
                         ( file ) => {
@@ -207,6 +258,7 @@ export default class Resources extends EventEmitter {
                     break
 
                 case 'hdrTexture':
+                    await this._ensureHDRLoader()
                     this.loaders.HDRLoader.load(
                         source.path,
                         ( file ) => {
@@ -216,6 +268,7 @@ export default class Resources extends EventEmitter {
                     break
 
                 case 'exrTexture':
+                    await this._ensureEXRLoader()
                     this.loaders.EXRLoader.load(
                         source.path,
                         ( file ) => {
@@ -225,6 +278,7 @@ export default class Resources extends EventEmitter {
                     break
 
                 case 'font':
+                    await this._ensureFontLoader()
                     this.loaders.fontLoader.load(
                         source.path,
                         ( file ) => {

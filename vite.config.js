@@ -36,7 +36,20 @@ export default ({ mode }) => ({
     {
         outDir: '../dist',
         emptyOutDir: true,
-        sourcemap: mode !== 'production'
+        sourcemap: mode !== 'production',
+        chunkSizeWarningLimit: 1000,
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (id.includes('node_modules')) {
+                        if (id.includes('three')) return 'vendor-three'
+                        if (id.includes('react') || id.includes('react-dom')) return 'vendor-react'
+                        if (id.includes('gsap')) return 'vendor-gsap'
+                        return 'vendor'
+                    }
+                },
+            },
+        },
     },
     plugins:
     [

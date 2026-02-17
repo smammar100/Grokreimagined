@@ -1,4 +1,10 @@
-import Experience from './Experience/Experience.js'
+// Render overlay first for fast first paint
 import './overlay/main.jsx'
 
-const experience = new Experience(document.querySelector('canvas.webgl'))
+// Load 3D experience in background after overlay is visible
+const canvas = document.querySelector('canvas.webgl')
+if (canvas) {
+  import('./Experience/Experience.js').then(({ default: Experience }) => {
+    new Experience(canvas)
+  })
+}

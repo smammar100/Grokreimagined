@@ -1,7 +1,5 @@
 import * as THREE from 'three/webgpu'
 import * as Helpers from '@experience/Utils/Helpers.js'
-import Stats from 'stats.js'
-import { Pane } from 'tweakpane';
 import Experience from "@experience/Experience.js";
 import Sizes from "./Sizes.js";
 
@@ -27,23 +25,26 @@ export default class Debug {
         //this.active = window.location.hash === '#debug'
         this.active = false
 
-
         if ( this.active ) {
-            this.panel = new Pane({
-                title: 'Debug',
-                container: document.getElementById('debug-panel'),
-                expanded: false
-            });
-
-            this.stats = new Stats()
-            this.stats.showPanel( 0 );
-
-            document.body.appendChild( this.stats.dom )
+            Promise.all( [
+                import( 'stats.js' ),
+                import( 'tweakpane' ),
+            ] ).then( ( [ StatsModule, { Pane } ] ) => {
+                const Stats = StatsModule.default
+                this.panel = new Pane( {
+                    title: 'Debug',
+                    container: document.getElementById( 'debug-panel' ),
+                    expanded: false,
+                } )
+                this.stats = new Stats()
+                this.stats.showPanel( 0 )
+                document.body.appendChild( this.stats.dom )
+            } )
         }
     }
 
     postInit() {
-        this.scene = experience.scene
+        this.scene = this.experience.scene
         //this.camera = this.experience.camera.instance
     }
 
