@@ -1,4 +1,3 @@
-/* Author: https://github.com/MisterPrada */
 import * as MathHelper from '@experience/Utils/MathHelper.js'
 
 let canvas = {}

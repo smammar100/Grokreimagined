@@ -1,4 +1,3 @@
-/* Author: https://github.com/MisterPrada */
 import * as MathHelper from '@experience/Utils/MathHelper.js'
 
 // const htmlCanvas = document.getElementById("preloader");
